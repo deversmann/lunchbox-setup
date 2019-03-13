@@ -1,0 +1,45 @@
+---
+- name: setup for RHHI install
+  hosts: localhost
+
+  tasks:
+    - name: Create engine partition
+      shell: echo -e "n\n\n\n+75G\nw\n" | fdisk /dev/nvme0n1
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Create vmstore partition
+      shell: echo -e "n\n\n\n\nw\n" | fdisk /dev/nvme0n1
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: ensure SSH key is generated
+      command: ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ''
+      args:
+        creates: /root/.ssh/id_rsa
+
+    - name: self authorize SSH key
+      authorized-key:
+        user: root
+        state: present
+        key: "{{ lookup('file', /root/.ssh/id_rsa_pub') }}"
+
+    - name: add repos
+      rhsm_repository:
+        name: "{{ item }}"
+        state: enabled
+        with_items:
+          - "rhel-7-server-rhv-4-mgmt-agent-rpms"
+          - "rh-gluster-3-for-rhel-7-server-rpms"
+
+    - name: install packasges
+      package:
+        name:
+          - cockpit-ovirt-dashboard
+          - gdeploy
+          - redhat-storage-server
+        state: present
+
+
