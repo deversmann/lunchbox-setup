@@ -24,7 +24,7 @@
       authorized-key:
         user: root
         state: present
-        key: "{{ lookup('file', /root/.ssh/id_rsa_pub') }}"
+        key: "{{ lookup('file', /root/.ssh/id_rsa.pub') }}"
 
     - name: add repos
       rhsm_repository:
