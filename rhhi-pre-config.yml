@@ -1,6 +1,7 @@
 ---
 - name: setup for RHHI install
   hosts: localhost
+  become: yes
 
   tasks:
     - name: Subscribe to RHSM
