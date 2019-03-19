@@ -3,38 +3,34 @@
   hosts: localhost
 
   tasks:
-    - name: Create engine partition
-      shell: echo -e "n\n\n\n+75G\nw\n" | fdisk /dev/nvme0n1
-      args:
-        executable: /bin/bash
-      ignore_errors: yes
-
-    - name: Create vmstore partition
-      shell: echo -e "n\n\n\n\nw\n" | fdisk /dev/nvme0n1
-      args:
-        executable: /bin/bash
-      ignore_errors: yes
-
-    - name: ensure SSH key is generated
-      command: ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ''
-      args:
-        creates: /root/.ssh/id_rsa
-
-    - name: self authorize SSH key
-      authorized-key:
-        user: root
+    - name: Subscribe to RHSM
+      redhat_subscription:
         state: present
-        key: "{{ lookup('file', /root/.ssh/id_rsa.pub') }}"
+        username: "{{ rhsm_username }}"
+        password: "{{ rhsm_password }}"
+        pool: "{{ rhsm_pool }}" 
 
-    - name: add repos
+    - name: Disable all repos
+      rhsm_repository:
+        name: "*"
+        state: disabled
+
+    - name: Enable specific repos
       rhsm_repository:
         name: "{{ item }}"
         state: enabled
         with_items:
+          - "rhel-7-server-rpms"
+          - "rhel-7-server-ansible-2-rpms
           - "rhel-7-server-rhv-4-mgmt-agent-rpms"
           - "rh-gluster-3-for-rhel-7-server-rpms"
 
-    - name: install packasges
+    - name: Update current packages
+      package:
+        name: "*"
+        state: latest
+
+    - name: Install new packages
       package:
         name:
           - cockpit-ovirt-dashboard
@@ -42,4 +38,53 @@
           - redhat-storage-server
         state: present
 
+    - name: Ensure SSH key is generated
+      command: ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ''
+      args:
+        creates: /root/.ssh/id_rsa
 
+    - name: Self authorize SSH key
+      authorized-key:
+        user: root
+        state: present
+        key: "{{ lookup('file', /root/.ssh/id_rsa.pub') }}"
+
+    - name: Gather current partition info
+      parted:
+        device: /dev/nvme0n1
+        state: info
+        unit: KiB
+      register: parted_out
+
+    - name: Check for at least 100 GiB of free space
+      assert:
+        that: >
+          "{{ (parted_out.disk.size - 
+          parted_out.partitions[-1].end) > 
+          (100.0 * 1024.0 * 1024.0) }}"
+        fail_msg: >
+          "There must be at least 100 GiB of available 
+          space on the disk. Found 
+          {{ ((parted_out.disk.size - 
+          parted_out.partitions[-1].end) / 
+          (1024.0 * 1024.0)) | round(1,'common') }} GiB"
+
+    - name: Create engine partition
+      shell: |
+        echo -e "n\n\n\n+75G\nw\n" | fdisk /dev/nvme0n1
+        partprobe
+      args:
+        executable: /bin/bash
+      register: fdisk_out
+      failed_when: "'Created partition' not in fdisk_out.stdout" 
+
+    - name: Create vmstore partition
+      shell: |
+        echo -e "n\n\n\n\nw\n" | fdisk /dev/nvme0n1
+        partprobe
+      args:
+        executable: /bin/bash
+      register: fdisk_out
+      failed_when: "'Created partition' not in fdisk_out.stdout"
+
+...
