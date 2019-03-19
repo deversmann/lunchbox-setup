@@ -2,6 +2,8 @@
 - name: setup for RHHI install
   hosts: localhost
   become: yes
+  become_method: sudo
+  become_user: root
 
   tasks:
     - name: Subscribe to RHSM
@@ -20,11 +22,12 @@
       rhsm_repository:
         name: "{{ item }}"
         state: enabled
-        with_items:
-          - "rhel-7-server-rpms"
-          - "rhel-7-server-ansible-2-rpms
-          - "rhel-7-server-rhv-4-mgmt-agent-rpms"
-          - "rh-gluster-3-for-rhel-7-server-rpms"
+    with_items:
+        - "rhel-7-server-rpms"
+        - "rhel-7-server-ansible-2-rpms"
+        - "rhel-7-server-rhv-4-mgmt-agent-rpms"
+        - "rhel-7-server-rhvh-4-rpms"
+        - "rh-gluster-3-for-rhel-7-server-rpms"
 
     - name: Update current packages
       package:
@@ -37,6 +40,10 @@
           - cockpit-ovirt-dashboard
           - gdeploy
           - redhat-storage-server
+          - gluster-ansible-roles
+          - ovirt-ansible-hosted-engine-setup
+          - ovirt-ansible-repositories
+          - ovirt-ansible-engine-setup
         state: present
 
     - name: Ensure SSH key is generated
@@ -44,11 +51,16 @@
       args:
         creates: /root/.ssh/id_rsa
 
+    - name: Get contents of the root key ('locate' doesn't work in become)
+      slurp:
+        src: /root/.ssh/id_rsa.pub
+      register: ssh_key
+
     - name: Self authorize SSH key
-      authorized-key:
+      authorized_key:
         user: root
         state: present
-        key: "{{ lookup('file', /root/.ssh/id_rsa.pub') }}"
+        key: "{{ ssh_key.content | b64decode }}"
 
     - name: Gather current partition info
       parted:
@@ -59,16 +71,11 @@
 
     - name: Check for at least 100 GiB of free space
       assert:
-        that: >
-          "{{ (parted_out.disk.size - 
-          parted_out.partitions[-1].end) > 
-          (100.0 * 1024.0 * 1024.0) }}"
+        that: "{{ (parted_out.disk.size - parted_out.partitions[-1].end) > (100.0 * 1024.0 * 1024.0) }}"
         fail_msg: >
-          "There must be at least 100 GiB of available 
-          space on the disk. Found 
-          {{ ((parted_out.disk.size - 
-          parted_out.partitions[-1].end) / 
-          (1024.0 * 1024.0)) | round(1,'common') }} GiB"
+          "There must be at least 100 GiB of available space on the disk. Found
+          {{ ((parted_out.disk.size - parted_out.partitions[-1].end) / (1024.0 * 1024.0)) |
+          round(1,'common') }} GiB"
 
     - name: Create engine partition
       shell: |
