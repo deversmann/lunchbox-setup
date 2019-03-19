@@ -1,0 +1,5 @@
+---
+rhsm_username: deversmarht
+rhsm_password: "{{ vault_rhsm_password }}"
+rhsm_pool: "Employee SKU"
+...
