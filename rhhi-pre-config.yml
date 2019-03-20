@@ -46,6 +46,31 @@
           - ovirt-ansible-engine-setup
         state: present
 
+    - name: Allow group wheel password-less sudo
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%wheel\s'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+    - name: Ensure root's .ssh directory exists
+      file:
+        path: /root/.ssh
+        state: directory
+        mode: '700'
+
+    - name: Update known_hosts with external info
+      known_hosts:
+        path: /root/.ssh/known_hosts
+        name: "{{ ansible_fqdn }}"
+        key: "{{ ansible_fqdn }},{{ ansible_hostname }},{{ ansible_default_ipv4.address }} ecdsa-sha2-nistp256 {{ ansible_ssh_host_key_ecdsa_public }}"
+
+    - name: Update known_hosts with localhost info
+      known_hosts:
+        path: /root/.ssh/known_hosts
+        name: "localhost"
+        key: "localhost,localhost.localdomain,localhost4,localhost4.localdomain4,127.0.0.1 ecdsa-sha2-nistp256 {{ ansible_ssh_host_key_ecdsa_public }}"
+
     - name: Ensure SSH key is generated
       command: ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ''
       args:
