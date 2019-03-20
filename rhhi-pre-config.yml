@@ -12,11 +12,13 @@
         username: "{{ rhsm_username }}"
         password: "{{ rhsm_password }}"
         pool: "{{ rhsm_pool }}" 
+      tags: subs
 
     - name: Disable all repos
       rhsm_repository:
         name: "*"
         state: disabled
+      tags: repos
 
     - name: Enable specific repos
       rhsm_repository:
@@ -28,11 +30,13 @@
         - "rhel-7-server-rhv-4-mgmt-agent-rpms"
         - "rhel-7-server-rhvh-4-rpms"
         - "rh-gluster-3-for-rhel-7-server-rpms"
+      tags: repos
 
     - name: Update current packages
       package:
         name: "*"
         state: latest
+      tags: packages
 
     - name: Install new packages
       package:
@@ -45,6 +49,7 @@
           - ovirt-ansible-repositories
           - ovirt-ansible-engine-setup
         state: present
+      tags: packages
 
     - name: Allow group wheel password-less sudo
       lineinfile:
@@ -52,40 +57,47 @@
         state: present
         regexp: '^%wheel\s'
         line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+      tags: security
 
     - name: Ensure root's .ssh directory exists
       file:
         path: /root/.ssh
         state: directory
         mode: '700'
+      tags: security
 
     - name: Update known_hosts with external info
       known_hosts:
         path: /root/.ssh/known_hosts
         name: "{{ ansible_fqdn }}"
         key: "{{ ansible_fqdn }},{{ ansible_hostname }},{{ ansible_default_ipv4.address }} ecdsa-sha2-nistp256 {{ ansible_ssh_host_key_ecdsa_public }}"
+      tags: security
 
     - name: Update known_hosts with localhost info
       known_hosts:
         path: /root/.ssh/known_hosts
         name: "localhost"
         key: "localhost,localhost.localdomain,localhost4,localhost4.localdomain4,127.0.0.1 ecdsa-sha2-nistp256 {{ ansible_ssh_host_key_ecdsa_public }}"
+      tags: security
 
     - name: Ensure SSH key is generated
       command: ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ''
       args:
         creates: /root/.ssh/id_rsa
+      tags: security
 
     - name: Get contents of the root key ('locate' doesn't work in become)
       slurp:
         src: /root/.ssh/id_rsa.pub
       register: ssh_key
+      tags: security
 
     - name: Self authorize SSH key
       authorized_key:
         user: root
         state: present
         key: "{{ ssh_key.content | b64decode }}"
+      tags: security
 
     - name: Gather current partition info
       parted:
@@ -93,6 +105,7 @@
         state: info
         unit: KiB
       register: parted_out
+      tags: partitions
 
     - name: Check for at least 100 GiB of free space
       assert:
@@ -101,6 +114,7 @@
           "There must be at least 100 GiB of available space on the disk. Found
           {{ ((parted_out.disk.size - parted_out.partitions[-1].end) / (1024.0 * 1024.0)) |
           round(1,'common') }} GiB"
+      tags: partitions
 
     - name: Create engine partition
       shell: |
@@ -110,6 +124,7 @@
         executable: /bin/bash
       register: fdisk_out
       failed_when: "'Created partition' not in fdisk_out.stdout" 
+      tags: partitions
 
     - name: Create vmstore partition
       shell: |
@@ -119,5 +134,6 @@
         executable: /bin/bash
       register: fdisk_out
       failed_when: "'Created partition' not in fdisk_out.stdout"
+      tags: partitions
 
 ...
