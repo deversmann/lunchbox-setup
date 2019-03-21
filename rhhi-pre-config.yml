@@ -28,7 +28,6 @@
         - "rhel-7-server-rpms"
         - "rhel-7-server-ansible-2-rpms"
         - "rhel-7-server-rhv-4-mgmt-agent-rpms"
-        - "rhel-7-server-rhvh-4-rpms"
         - "rh-gluster-3-for-rhel-7-server-rpms"
       tags: repos
 
@@ -118,7 +117,7 @@
 
     - name: Create engine partition
       shell: |
-        echo -e "n\n\n\n+75G\nw\n" | fdisk /dev/nvme0n1
+        echo -e "n\n\n\n+76804M\nw\n" | fdisk /dev/nvme0n1
         partprobe
       args:
         executable: /bin/bash
